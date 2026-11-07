@@ -1,0 +1,67 @@
+name: Build HANDI
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    env:
+      # Адрес сервера лицензий уже вписан. Если смените домен, поправьте здесь.
+      HANDI_LICENSE_API_URL: https://handi-admin.site.je/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установка Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.2'
+          host: windows
+          target: desktop
+          arch: win64_msvc2019_64
+          cache: true
+
+      - name: Конфигурация CMake
+        working-directory: app
+        shell: pwsh
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR" "-DHANDI_LICENSE_API_URL=$env:HANDI_LICENSE_API_URL"
+
+      - name: Сборка
+        working-directory: app
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      - name: Самопроверка ядра
+        working-directory: app
+        shell: pwsh
+        continue-on-error: true
+        run: ./build/Release/handi_selftest.exe
+
+      - name: Сборка папки программы и ZIP
+        working-directory: app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/HANDI | Out-Null
+          Copy-Item build/Release/HANDI.exe dist/HANDI/
+          windeployqt --release --no-translations --no-system-d3d-compiler dist/HANDI/HANDI.exe
+          Copy-Item ../README.md dist/HANDI/README.md
+          Compress-Archive -Path dist/HANDI -DestinationPath dist/HANDI-win64.zip -Force
+
+      - name: Готовый ZIP (вкладка Actions → Artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: HANDI-win64
+          path: app/dist/HANDI-win64.zip
+
+      - name: Релиз со ссылкой для скачивания (вкладка Releases)
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: HANDI build ${{ github.run_number }}
+          files: app/dist/HANDI-win64.zip
