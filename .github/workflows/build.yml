@@ -13,7 +13,7 @@ jobs:
     runs-on: windows-2022
     env:
       # Адрес сервера лицензий уже вписан. Если смените домен, поправьте здесь.
-      HANDI_LICENSE_API_URL: https://handi-admin.site.je/api
+      HANDI_LICENSE_API_URL: http://f1327107.xsph.ru/api
     steps:
       - uses: actions/checkout@v4
 
