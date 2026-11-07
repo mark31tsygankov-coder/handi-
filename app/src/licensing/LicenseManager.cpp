@@ -150,10 +150,14 @@ void LicenseManager::send(const QString& endpoint, const QString& key, bool acti
 
         if (!http.isValid() || o.isEmpty() || (http.toInt() >= 500) || http.toInt() == 429) {
             const QString netMsg = http.toInt() == 429 ? QString("Слишком много запросов") : QString("Сервер недоступен");
+            // Диагностика: показываем, что реально ответил сервер (или почему нет ответа).
+            const QString body = (o.isEmpty() && !data.isEmpty()) ? QStringLiteral(", не JSON: ") + QString::fromUtf8(data.left(70)).simplified() : QString();
+            const QString detail = QStringLiteral(" [HTTP %1; %2%3]")
+                .arg(http.isValid() ? QString::number(http.toInt()) : QStringLiteral("нет ответа"), reply->errorString(), body);
             if (!activating) {
                 if (const auto s = load()) { finish(offlineFallback(*s, netMsg)); return; }
             }
-            finish(LicenseStatus{LicenseStatus::Result::NetworkError, "network", netMsg + ". Проверьте подключение к интернету"});
+            finish(LicenseStatus{LicenseStatus::Result::NetworkError, "network", netMsg + detail + ". Проверьте подключение к интернету"});
             return;
         }
 
